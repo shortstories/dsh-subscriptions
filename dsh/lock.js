@@ -118,6 +118,9 @@ async function ownerIsDead(lockPath) {
  * @returns {Promise<unknown>} the operation's result; the lock releases either way.
  */
 async function withFileLock(filename, operation) {
+  // The lock is created before writeFileAtomic gets a chance to prepare the
+  // credential directory. First sign-in must also work with a fresh home.
+  await mkdir(dirname(filename), { recursive: true, mode: 0o700 })
   const lockPath = `${filename}.lock`
   let recovered = false
   const run = async () => {

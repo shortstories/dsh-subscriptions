@@ -9,7 +9,7 @@ const assert = require('node:assert/strict')
 const { fork } = require('node:child_process')
 const { mkdtempSync, readFileSync, statSync, writeFileSync, existsSync } = require('node:fs')
 const { tmpdir } = require('node:os')
-const { join } = require('node:path')
+const { join, dirname } = require('node:path')
 const { withFileLock, writeFileAtomic } = require('../dsh/lock.js')
 
 /** A scratch credential file. */
@@ -19,6 +19,21 @@ function scratch() {
   writeFileSync(file, `${JSON.stringify({ writers: [] })}\n`, { mode: 0o600 })
   return file
 }
+
+test('first sign-in creates a private nested directory before acquiring its lock', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'dsh-first-signin-'))
+  const file = join(root, 'subscriptions', 'codex', 'credential.json')
+  await withFileLock(file, async () => {
+    assert.equal(existsSync(`${file}.lock`), true)
+    await writeFileAtomic(file, JSON.stringify({ connected: true }), { mode: 0o600, dirMode: 0o700 })
+  })
+  assert.deepEqual(JSON.parse(readFileSync(file, 'utf8')), { connected: true })
+  assert.equal(existsSync(`${file}.lock`), false)
+  if (process.platform !== 'win32') {
+    assert.equal(statSync(dirname(file)).mode & 0o777, 0o700)
+    assert.equal(statSync(file).mode & 0o777, 0o600)
+  }
+})
 
 /** Run one worker process against the file. */
 function worker(file, marker) {
