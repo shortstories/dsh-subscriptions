@@ -5,7 +5,7 @@
 // truncated and must not be mistaken for a finished response.
 
 const { EventSourceParserStream } = require('eventsource-parser/stream')
-const { SubscriptionError } = require('../errors.js')
+const { SubscriptionError, httpErrorCode, redact } = require('../errors.js')
 
 /** The events that end a response. */
 const TERMINAL = new Set(['response.completed', 'response.incomplete', 'response.failed'])
@@ -27,6 +27,13 @@ async function* parseSse(stream, onComment) {
       parsed = JSON.parse(data)
     } catch {
       throw new SubscriptionError(`malformed SSE payload: ${data.slice(0, 120)}`, 'MALFORMED_RESPONSE')
+    }
+    if (parsed.type === 'error') {
+      const error = parsed.error ?? parsed
+      const detail = [error.type, error.code, error.message].filter(value => typeof value === 'string').join(' ')
+      const status = error.status ?? parsed.status
+        ?? (/rate.limit/i.test(detail) ? 429 : /invalid.request|no tool output/i.test(detail) ? 400 : 500)
+      throw new SubscriptionError(`Codex stream error: ${redact(detail || 'Unknown upstream error')}`, httpErrorCode(status, detail), { status })
     }
     yield parsed
     if (TERMINAL.has(parsed.type)) return

@@ -116,6 +116,11 @@ function serializeConversation(messages, system) {
   const input = []
   for (const message of messages) {
     if (message.role === 'system') continue
+    if (message.role === 'tool') {
+      assertTextOnly(message.content)
+      input.push({ type: 'function_call_output', call_id: message.toolCallId, output: flattenText(message.content) || '(no output)' })
+      continue
+    }
     for (const block of message.content) {
       assertTextOnly([block])
       if (block.type === 'tool-call' && message.role !== 'assistant') {
@@ -189,6 +194,16 @@ async function serializeConversationWithImages(messages, system, attachments, si
 
   for (const message of messages) {
     if (message.role === 'system') continue
+    if (message.role === 'tool') {
+      const images = []
+      for (const block of message.content) {
+        if (block.type === 'image') images.push(await imagePart(block, attachments, signal))
+      }
+      input.push({ type: 'function_call_output', call_id: message.toolCallId,
+        output: flattenText(message.content) || (images.length ? '(see attached image)' : '(no output)') })
+      pendingToolImages.push(...images)
+      continue
+    }
     if (message.role === 'assistant') {
       await flushToolImages()
       for (const block of message.content) {
