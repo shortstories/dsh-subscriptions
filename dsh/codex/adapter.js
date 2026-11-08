@@ -64,7 +64,7 @@ function createCodexAdapter({ config, resolveAccess, resolveAttachments }) {
           'openai-beta': 'responses=experimental',
           originator: ORIGINATOR,
           'user-agent': codexUserAgent(clientVersion().version),
-          session_id: randomUUID(),
+          session_id: options.sessionId ? String(options.sessionId) : randomUUID(),
           // Absent when the credential carries no account: sending an empty
           // header routes the request to the wrong workspace.
           ...access.accountId.length === 0 ? {} : { 'chatgpt-account-id': access.accountId },

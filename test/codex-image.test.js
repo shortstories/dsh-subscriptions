@@ -25,12 +25,14 @@ const image = attachment => ({ type: 'image', attachment })
 test('a user image becomes an input_image part, order preserved', async () => {
   const body = await serializeRequestWithImages({
     model: 'm',
+    sessionId: 'image-session',
     messages: [{ role: 'user', content: [
       { type: 'text', text: 'look' },
       image({ id: 'a1' }),
       { type: 'text', text: 'carefully' },
     ] }],
   }, {}, attachments)
+  assert.equal(body.prompt_cache_key, 'image-session')
   assert.deepEqual(body.input, [{ type: 'message', role: 'user', content: [
     { type: 'input_text', text: 'look' },
     { type: 'input_image', image_url: DATA_URL },

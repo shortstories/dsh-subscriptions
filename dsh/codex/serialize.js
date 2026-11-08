@@ -267,6 +267,9 @@ function assembleRequest(options, defaults, { instructions, input }) {
   require('../reasoning.js').assertReasoningEffort('codex', options.model, options.reasoningEffort)
   return {
     model: options.model,
+    // Keep cache routing stable across turns, but never share a fallback key
+    // between callers that did not supply a harness session identity.
+    ...options.sessionId ? { prompt_cache_key: String(options.sessionId) } : {},
     ...instructions === undefined ? {} : { instructions },
     input,
     stream: true,

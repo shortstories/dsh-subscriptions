@@ -105,6 +105,32 @@ test('the request carries the Codex CLI identity the backend gates on', async ()
   } finally { server.close() }
 })
 
+test('session routing and cache keys stay stable within a conversation and separate across conversations', async () => {
+  const server = await endpoint(sse(TEXT_TURN))
+  try {
+    const adapter = adapterFor(server.base)
+    for (const sessionId of ['session-a', 'session-a', 'session-b']) {
+      await collect(adapter, { sessionId })
+    }
+    assert.deepEqual(server.requests.map(sent => sent.headers.session_id), ['session-a', 'session-a', 'session-b'])
+    assert.deepEqual(server.requests.map(sent => JSON.parse(sent.body).prompt_cache_key), ['session-a', 'session-a', 'session-b'])
+  } finally { server.close() }
+})
+
+test('missing session identities use independent headers without a shared cache key', async () => {
+  const server = await endpoint(sse(TEXT_TURN))
+  try {
+    const adapter = adapterFor(server.base)
+    await collect(adapter)
+    await collect(adapter)
+    assert.notEqual(server.requests[0].headers.session_id, server.requests[1].headers.session_id)
+    for (const sent of server.requests) {
+      assert.match(sent.headers.session_id, /^[0-9a-f-]{36}$/)
+      assert.equal(Object.hasOwn(JSON.parse(sent.body), 'prompt_cache_key'), false)
+    }
+  } finally { server.close() }
+})
+
 test('an absent account id omits the header rather than sending it empty', async () => {
   // An empty header routes the request to the wrong workspace.
   const server = await endpoint(sse(TEXT_TURN))
